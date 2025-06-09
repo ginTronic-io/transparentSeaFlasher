@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>transparentSea DFU Flasher</title>
-  <script src="dfu.js"></script>
+  <script src="dfu.js"></script> <!-- Download this from https://devanlai.github.io/webdfu/dfu-util/dfu.js -->
   <style>
     body {
       font-family: sans-serif;
@@ -64,7 +64,7 @@
   </style>
 </head>
 <body>
-  <h1>transparentSea DFU Flasher 4</h1>
+  <h1>transparentSea DFU Flasher 6</h1>
   <button onclick="flashFirmware('bootloader.bin')">Flash Bootloader</button>
   <button onclick="flashFirmware('test_firmware.bin')">Flash Test Firmware</button>
   <button onclick="flashFirmware('production_firmware.bin')">Flash Production Firmware</button>
@@ -89,9 +89,9 @@
         const devices = await navigator.usb.getDevices();
         for (const device of devices) {
           if (device.vendorId === 0x0483) {
-            dfuDevice = new dfu.Device(device);
+            dfuDevice = new DFUDevice(device);
             await dfuDevice.open();
-            const interfaces = await dfu.findDeviceDfuInterfaces(device);
+            const interfaces = await DFU.findDeviceDfuInterfaces(device);
             if (interfaces.length > 0) {
               dfuInterface = interfaces[0];
               await dfuDevice.claimInterface(dfuInterface.interfaceNumber);
@@ -122,9 +122,9 @@
       try {
         if (!dfuDevice || !dfuInterface) {
           const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x0483 }] });
-          dfuDevice = new dfu.Device(device);
+          dfuDevice = new DFUDevice(device);
           await dfuDevice.open();
-          const interfaces = await dfu.findDeviceDfuInterfaces(device);
+          const interfaces = await DFU.findDeviceDfuInterfaces(device);
           if (interfaces.length === 0) throw new Error("No DFU interfaces found.");
           dfuInterface = interfaces[0];
           await dfuDevice.claimInterface(dfuInterface.interfaceNumber);
