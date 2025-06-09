@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>transparentSea DFU Flasher</title>
-  <script src="dfu.js"></script> <!-- Download this from https://devanlai.github.io/webdfu/dfu-util/dfu.js -->
+  <script src="dfu.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -64,7 +64,7 @@
   </style>
 </head>
 <body>
-  <h1>transparentSea DFU Flasher 6</h1>
+  <h1>transparentSea DFU Flasher 7</h1>
   <button onclick="flashFirmware('bootloader.bin')">Flash Bootloader</button>
   <button onclick="flashFirmware('test_firmware.bin')">Flash Test Firmware</button>
   <button onclick="flashFirmware('production_firmware.bin')">Flash Production Firmware</button>
@@ -77,7 +77,6 @@
 
   <script>
     let dfuDevice = null;
-    let dfuInterface = null;
 
     async function autoConnect() {
       const loader = document.getElementById('loader');
@@ -89,12 +88,10 @@
         const devices = await navigator.usb.getDevices();
         for (const device of devices) {
           if (device.vendorId === 0x0483) {
-            dfuDevice = new DFUDevice(device);
-            await dfuDevice.open();
-            const interfaces = await DFU.findDeviceDfuInterfaces(device);
+            const interfaces = dfu.findDeviceDfuInterfaces(device);
             if (interfaces.length > 0) {
-              dfuInterface = interfaces[0];
-              await dfuDevice.claimInterface(dfuInterface.interfaceNumber);
+              dfuDevice = new dfu.Device(device, interfaces[0]);
+              await dfuDevice.open();
               document.getElementById('status').textContent = 'Status: Device auto-connected.';
               loader.style.display = 'none';
               return;
@@ -120,14 +117,12 @@
       const progressContainer = document.getElementById('progressContainer');
 
       try {
-        if (!dfuDevice || !dfuInterface) {
+        if (!dfuDevice) {
           const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x0483 }] });
-          dfuDevice = new DFUDevice(device);
-          await dfuDevice.open();
-          const interfaces = await DFU.findDeviceDfuInterfaces(device);
+          const interfaces = dfu.findDeviceDfuInterfaces(device);
           if (interfaces.length === 0) throw new Error("No DFU interfaces found.");
-          dfuInterface = interfaces[0];
-          await dfuDevice.claimInterface(dfuInterface.interfaceNumber);
+          dfuDevice = new dfu.Device(device, interfaces[0]);
+          await dfuDevice.open();
         }
 
         statusEl.textContent = `Status: Fetching ${fileName}...`;
@@ -138,11 +133,7 @@
         progressBar.style.width = '0%';
         statusEl.textContent = 'Status: Flashing firmware...';
 
-        await dfuDevice.do_download(dfuInterface, binData, {
-          onProgress: percent => {
-            progressBar.style.width = `${Math.round(percent * 100)}%`;
-          }
-        });
+        await dfuDevice.do_download(2048, binData, true);
 
         statusEl.textContent = 'Status: Flash complete.';
         progressBar.style.width = '100%';
