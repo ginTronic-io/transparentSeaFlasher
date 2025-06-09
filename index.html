@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>transparentSea firmware Flasher</title>
+  <title>transparentSea DFU Flasher</title>
   <script src="https://unpkg.com/@webdfu/webdfu@1.2.1/dist/webdfu.bundle.js"></script>
   <style>
     body {
@@ -29,9 +29,37 @@
       background-color: #45a049;
     }
     #status {
-      margin-top: 2rem;
+      margin-top: 1.5rem;
       font-size: 1rem;
       color: #333;
+    }
+    #progressContainer {
+      width: 80%;
+      margin: 1rem auto;
+      background: #ddd;
+      border-radius: 10px;
+      overflow: hidden;
+      height: 20px;
+      display: none;
+    }
+    #progressBar {
+      height: 100%;
+      background: #4CAF50;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    #loader {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #888;
+    }
+    #retryButton {
+      display: none;
+      margin-top: 1rem;
+      background-color: #f44336;
+    }
+    #retryButton:hover {
+      background-color: #d32f2f;
     }
   </style>
 </head>
@@ -40,38 +68,91 @@
   <button onclick="flashFirmware('bootloader.bin')">Flash Bootloader</button>
   <button onclick="flashFirmware('test_firmware.bin')">Flash Test Firmware</button>
   <button onclick="flashFirmware('production_firmware.bin')">Flash Production Firmware</button>
+  <div id="progressContainer">
+    <div id="progressBar"></div>
+  </div>
   <p id="status">Status: Idle</p>
+  <div id="loader">Attempting auto-connect...</div>
+  <button id="retryButton" onclick="retryConnect()">Retry Connection</button>
 
   <script>
-    async function flashFirmware(fileName) {
-      const statusEl = document.getElementById('status');
-      statusEl.textContent = 'Status: Connecting to device...';
+    let dfuDevice = null;
+    let dfuInterface = null;
+
+    async function autoConnect() {
+      const loader = document.getElementById('loader');
+      const retryButton = document.getElementById('retryButton');
+      loader.style.display = 'block';
+      retryButton.style.display = 'none';
 
       try {
-        const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x0483 }] });
-        const dfuDevice = new dfu.Device(device);
-
-        await dfuDevice.open();
-        const interfaces = await dfu.findDeviceDfuInterfaces(device);
-        if (interfaces.length === 0) {
-          throw new Error("No DFU interfaces found.");
+        const devices = await navigator.usb.getDevices();
+        for (const device of devices) {
+          if (device.vendorId === 0x0483) {
+            dfuDevice = new dfu.Device(device);
+            await dfuDevice.open();
+            const interfaces = await dfu.findDeviceDfuInterfaces(device);
+            if (interfaces.length > 0) {
+              dfuInterface = interfaces[0];
+              await dfuDevice.claimInterface(dfuInterface.interfaceNumber);
+              document.getElementById('status').textContent = 'Status: Device auto-connected.';
+              loader.style.display = 'none';
+              return;
+            }
+          }
         }
+        throw new Error('No authorized DFU device found.');
+      } catch (err) {
+        console.warn('Auto-connect failed:', err);
+        document.getElementById('status').textContent = 'Status: Auto-connect failed.';
+        loader.style.display = 'none';
+        retryButton.style.display = 'inline-block';
+      }
+    }
 
-        await dfuDevice.claimInterface(interfaces[0].interfaceNumber);
+    function retryConnect() {
+      autoConnect();
+    }
+
+    async function flashFirmware(fileName) {
+      const statusEl = document.getElementById('status');
+      const progressBar = document.getElementById('progressBar');
+      const progressContainer = document.getElementById('progressContainer');
+
+      try {
+        if (!dfuDevice || !dfuInterface) {
+          const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x0483 }] });
+          dfuDevice = new dfu.Device(device);
+          await dfuDevice.open();
+          const interfaces = await dfu.findDeviceDfuInterfaces(device);
+          if (interfaces.length === 0) throw new Error("No DFU interfaces found.");
+          dfuInterface = interfaces[0];
+          await dfuDevice.claimInterface(dfuInterface.interfaceNumber);
+        }
 
         statusEl.textContent = `Status: Fetching ${fileName}...`;
         const response = await fetch(fileName);
         const binData = await response.arrayBuffer();
 
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
         statusEl.textContent = 'Status: Flashing firmware...';
-        await dfuDevice.do_download(interfaces[0], binData);
+
+        await dfuDevice.do_download(dfuInterface, binData, {
+          onProgress: percent => {
+            progressBar.style.width = `${Math.round(percent * 100)}%`;
+          }
+        });
 
         statusEl.textContent = 'Status: Flash complete.';
+        progressBar.style.width = '100%';
       } catch (err) {
         console.error(err);
         statusEl.textContent = 'Status: Error - ' + err.message;
       }
     }
+
+    autoConnect();
   </script>
 </body>
 </html>
