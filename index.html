@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>transparentSea DFU Flasher</title>
-  <script src="https://unpkg.com/@webdfu/webdfu@1.2.1/dist/webdfu.bundle.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -64,7 +63,7 @@
   </style>
 </head>
 <body>
-  <h1>transparentSea DFU Flashe</h1>
+  <h1>transparentSea DFU Flasher 2</h1>
   <button onclick="flashFirmware('bootloader.bin')">Flash Bootloader</button>
   <button onclick="flashFirmware('test_firmware.bin')">Flash Test Firmware</button>
   <button onclick="flashFirmware('production_firmware.bin')">Flash Production Firmware</button>
@@ -75,7 +74,9 @@
   <div id="loader">Attempting auto-connect...</div>
   <button id="retryButton" onclick="retryConnect()">Retry Connection</button>
 
-  <script>
+  <script type="module">
+    import * as dfu from 'https://unpkg.com/@webdfu/webdfu@1.2.1/dist/webdfu.bundle.mjs';
+
     let dfuDevice = null;
     let dfuInterface = null;
 
@@ -108,10 +109,6 @@
         loader.style.display = 'none';
         retryButton.style.display = 'inline-block';
       }
-    }
-
-    function retryConnect() {
-      autoConnect();
     }
 
     async function flashFirmware(fileName) {
@@ -151,6 +148,9 @@
         statusEl.textContent = 'Status: Error - ' + err.message;
       }
     }
+
+    window.flashFirmware = flashFirmware;
+    window.retryConnect = autoConnect;
 
     autoConnect();
   </script>
