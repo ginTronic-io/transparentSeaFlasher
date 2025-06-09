@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Daisy Seed DFU Flasher</title>
+  <script src="https://devanlai.github.io/webdfu/dfu.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      text-align: center;
+      background: #f7f7f7;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 2rem;
+    }
+    button {
+      padding: 1rem 2rem;
+      margin: 1rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #status {
+      margin-top: 2rem;
+      font-size: 1rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Daisy Seed DFU Flasher</h1>
+  <button onclick="flashFirmware('bootloader.bin')">Flash Bootloader</button>
+  <button onclick="flashFirmware('test_firmware.bin')">Flash Test Firmware</button>
+  <button onclick="flashFirmware('production_firmware.bin')">Flash Production Firmware</button>
+  <p id="status">Status: Idle</p>
+
+  <script>
+    async function flashFirmware(fileName) {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = 'Status: Connecting to device...';
+
+      try {
+        const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x0483 }] });
+        const dfuDevice = new dfu.Device(device);
+
+        await dfuDevice.open();
+        const interfaces = await dfu.findDeviceDfuInterfaces(device);
+        if (interfaces.length === 0) {
+          throw new Error("No DFU interfaces found.");
+        }
+
+        await dfuDevice.claimInterface(interfaces[0].interfaceNumber);
+
+        statusEl.textContent = `Status: Fetching ${fileName}...`;
+        const response = await fetch(fileName);
+        const binData = await response.arrayBuffer();
+
+        statusEl.textContent = 'Status: Flashing firmware...';
+        await dfuDevice.do_download(interfaces[0], binData);
+
+        statusEl.textContent = 'Status: Flash complete.';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Status: Error - ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
